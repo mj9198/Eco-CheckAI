@@ -1,6 +1,15 @@
 <!DOCTYPE html>
 <html lang="ko">
-<head>
+<head
+  <audio
+  id="bgm"
+  loop
+>
+  <source
+    src="cute-lofi.mp3"
+    type="audio/mpeg"
+  >
+</audio>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
@@ -13,6 +22,14 @@
   <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
 
   <style>
+    @font-face {
+  font-family: 'Mongdang';
+  src: url('./학교안심몽당분필R.ttf') format('truetype');
+}
+
+*{
+  font-family:'Mongdang', sans-serif !important;
+}
     /* =========================================================
        ECO-CHECK AI
        전체적인 디자인
@@ -82,13 +99,7 @@
         최대한 표현하기 위한 글꼴 조합입니다.
 
         별도의 외부 폰트 파일 없이 작동합니다.
-      */
-      font-family:
-        "Arial Black",
-        "Malgun Gothic",
-        "Apple SD Gothic Neo",
-        "Trebuchet MS",
-        sans-serif;
+    
 
       line-height: 1.55;
     }
@@ -248,8 +259,90 @@
 
       border-radius: 50%;
     }
+/* =========================
+   망곰이
+========================= */
 
+#manggom{
+  position:fixed;
+  bottom:20px;
+  left:-140px;
 
+  width:120px;
+
+  z-index:99999;
+
+  animation:
+    walkAround 18s linear infinite,
+    bounce 1.8s ease-in-out infinite;
+}
+
+#manggomSpeech{
+  position:fixed;
+
+  bottom:150px;
+  left:40px;
+
+  background:white;
+
+  border:4px solid #222;
+
+  border-radius:20px;
+
+  padding:12px 18px;
+
+  font-size:18px;
+
+  box-shadow:4px 4px 0 rgba(0,0,0,.15);
+
+  z-index:99999;
+}
+
+@keyframes walkAround{
+
+  0%{
+    left:-140px;
+    transform:scaleX(1);
+  }
+
+  49%{
+    left:calc(100vw - 140px);
+    transform:scaleX(1);
+  }
+
+  50%{
+    transform:scaleX(-1);
+  }
+
+  99%{
+    left:-140px;
+    transform:scaleX(-1);
+  }
+
+  100%{
+    transform:scaleX(1);
+  }
+}
+
+@keyframes bounce{
+
+  0%,100%{
+    margin-bottom:0;
+  }
+
+  50%{
+    margin-bottom:12px;
+  }
+}
+<img
+  src="img.gif"
+  id="manggom"
+  alt="망곰이"
+>
+
+<div id="manggomSpeech">
+  분리수거를 잘해보잠 ✨
+</div>
     /* =========================================================
        공통 텍스트
        ========================================================= */
@@ -3348,8 +3441,72 @@
     // ---------------------------------------------------------
 
     loadModel();
+    /* =========================
+   브금 자동재생
+========================= */
+
+document.addEventListener(
+  "click",
+  () => {
+
+    const bgm =
+      document.getElementById("bgm");
+
+    bgm.play().catch(()=>{});
+
+  },
+  { once:true }
+);
+
+
+/* =========================
+   망곰이 말풍선
+========================= */
+
+const manggomMessages = [
+
+  "분리수거를 잘해보잠 ✨",
+
+  "망곰이가 응원한당 🐻",
+
+  "환경을 지켜보잠 🌱",
+
+  "오늘도 화이팅이잠 💙",
+
+  "깨끗하게 버려보잠 ♻️",
+
+  "라벨은 떼고 버리잠 😆",
+
+  "캔은 비우고 버리잠 🥤",
+
+  "지구가 좋아한당 🌎"
+
+];
+
+const speech =
+  document.getElementById(
+    "manggomSpeech"
+  );
+
+setInterval(() => {
+
+  speech.textContent =
+    manggomMessages[
+      Math.floor(
+        Math.random() *
+        manggomMessages.length
+      )
+    ];
+
+}, 4000);
 
   </script>
 
 </body>
 </html>
+project
+│
+├─ index.html
+├─ img.gif
+├─ cute-lofi.mp3
+└─ 학교안심몽당분필R.ttf
