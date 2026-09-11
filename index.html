@@ -1,0 +1,3355 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Eco-Check AI | 페트병·캔 올바른 분리배출 상태 판별기</title>
+
+  <!-- TensorFlow.js 공식 CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+
+  <!-- Teachable Machine Image 공식 라이브러리 -->
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+
+  <style>
+    /* =========================================================
+       ECO-CHECK AI
+       전체적인 디자인
+       ========================================================= */
+
+    :root {
+      --sky: #dff5ff;
+      --sky2: #bdeaff;
+      --blue: #2478d7;
+      --blue-dark: #1254a0;
+      --blue-deep: #073b78;
+
+      --navy: #112d4d;
+      --text: #24445f;
+      --muted: #638099;
+
+      --white: #ffffff;
+
+      --green: #1ca86b;
+      --green-light: #e4f8ee;
+
+      --yellow: #d99a18;
+      --yellow-light: #fff6dc;
+
+      --red: #dc5555;
+      --red-light: #fff0f0;
+
+      --shadow:
+        0 14px 35px rgba(31, 109, 164, 0.15);
+
+      --shadow-blue:
+        0 16px 38px rgba(36, 120, 215, 0.22);
+    }
+
+
+    * {
+      box-sizing: border-box;
+    }
+
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+
+    body {
+      margin: 0;
+
+      color: var(--text);
+
+      background:
+        radial-gradient(
+          circle at 10% 5%,
+          #ffffff 0,
+          rgba(255,255,255,0.7) 12%,
+          transparent 28%
+        ),
+        linear-gradient(
+          180deg,
+          #ccefff 0%,
+          #effbff 45%,
+          #ccefff 100%
+        );
+
+      /*
+        사진 속 글씨처럼 굵고 손으로 쓴 듯한 느낌을
+        최대한 표현하기 위한 글꼴 조합입니다.
+
+        별도의 외부 폰트 파일 없이 작동합니다.
+      */
+      font-family:
+        "Arial Black",
+        "Malgun Gothic",
+        "Apple SD Gothic Neo",
+        "Trebuchet MS",
+        sans-serif;
+
+      line-height: 1.55;
+    }
+
+
+    button,
+    input {
+      font: inherit;
+    }
+
+
+    button {
+      cursor: pointer;
+    }
+
+
+    /* =========================================================
+       페이지
+       ========================================================= */
+
+    .page {
+      width: min(100% - 24px, 980px);
+
+      margin: 0 auto;
+
+      padding:
+        25px 0 60px;
+    }
+
+
+    /* =========================================================
+       HERO
+       ========================================================= */
+
+    .hero {
+      display: flex;
+
+      align-items: center;
+      justify-content: space-between;
+
+      gap: 30px;
+
+      min-height: 310px;
+
+      padding: 25px 10px 35px;
+    }
+
+
+    .hero-text {
+      flex: 1;
+
+      min-width: 0;
+    }
+
+
+    .eyebrow {
+      display: inline-block;
+
+      margin-bottom: 14px;
+
+      padding:
+        7px 15px;
+
+      border-radius: 999px;
+
+      background: var(--blue);
+
+      color: white;
+
+      font-size: 0.78rem;
+
+      font-weight: 900;
+
+      letter-spacing: -0.02em;
+
+      box-shadow:
+        0 7px 15px rgba(36, 120, 215, 0.2);
+    }
+
+
+    /*
+      제목은 참고 이미지의 굵고 강한 글씨 느낌을 강조합니다.
+    */
+    h1 {
+      margin: 0;
+
+      color: var(--blue-deep);
+
+      font-size:
+        clamp(2.7rem, 10vw, 5.5rem);
+
+      line-height: 0.95;
+
+      letter-spacing: -0.08em;
+
+      font-weight: 1000;
+
+      /*
+        글자가 약간 포스터처럼 보이도록 그림자를 사용합니다.
+      */
+      text-shadow:
+        3px 3px 0 rgba(255,255,255,0.9),
+        5px 5px 0 rgba(36,120,215,0.12);
+    }
+
+
+    .hero-description {
+      max-width: 620px;
+
+      margin: 20px 0 0;
+
+      color: var(--navy);
+
+      font-size:
+        clamp(0.95rem, 2vw, 1.12rem);
+
+      font-weight: 900;
+
+      letter-spacing: -0.04em;
+    }
+
+
+    /* =========================================================
+       캐릭터
+       ========================================================= */
+
+    .hero-image-wrap {
+      position: relative;
+
+      flex: 0 0 225px;
+
+      width: 225px;
+      height: 225px;
+
+      padding: 8px;
+
+      background: white;
+
+      border:
+        5px solid var(--blue);
+
+      border-radius: 50%;
+
+      box-shadow: var(--shadow-blue);
+
+      transform: rotate(3deg);
+    }
+
+
+    .hero-image {
+      display: block;
+
+      width: 100%;
+      height: 100%;
+
+      object-fit: cover;
+
+      border-radius: 50%;
+    }
+
+
+    /* =========================================================
+       공통 텍스트
+       ========================================================= */
+
+    .section-title {
+      margin: 0 0 9px;
+
+      color: var(--blue-deep);
+
+      font-size: 1.35rem;
+
+      font-weight: 1000;
+
+      letter-spacing: -0.05em;
+    }
+
+
+    .sub-info {
+      color: var(--muted);
+
+      font-size: 0.93rem;
+
+      font-weight: 800;
+
+      letter-spacing: -0.035em;
+    }
+
+
+    /* =========================================================
+       1. 문제 소개 - 지구 모양
+       ========================================================= */
+
+    .earth-section {
+      position: relative;
+
+      width: min(100%, 720px);
+
+      margin: 0 auto 30px;
+
+      padding: 72px 85px;
+
+      /*
+        완전한 원형 대신 약간 불규칙하게 만들어
+        일러스트 같은 느낌을 줍니다.
+      */
+      border-radius:
+        48% 52% 55% 45%
+        / 50% 47% 53% 50%;
+
+      background:
+        radial-gradient(
+          circle at 32% 28%,
+          #6dd7ff 0%,
+          #37b9ec 32%,
+          #1687ca 70%,
+          #0e6bab 100%
+        );
+
+      border:
+        8px solid white;
+
+      box-shadow:
+        var(--shadow-blue);
+
+      color: white;
+
+      overflow: hidden;
+    }
+
+
+    /*
+      지구의 대륙처럼 보이는 장식
+    */
+    .earth-section::before,
+    .earth-section::after {
+      content: "";
+
+      position: absolute;
+
+      background: rgba(90, 214, 130, 0.78);
+
+      border-radius:
+        45% 55% 40% 60%;
+    }
+
+
+    .earth-section::before {
+      width: 130px;
+      height: 75px;
+
+      top: 25px;
+      left: 55px;
+
+      transform: rotate(-18deg);
+    }
+
+
+    .earth-section::after {
+      width: 150px;
+      height: 95px;
+
+      right: 45px;
+      bottom: 30px;
+
+      transform: rotate(14deg);
+    }
+
+
+    .earth-content {
+      position: relative;
+
+      z-index: 2;
+
+      text-align: center;
+    }
+
+
+    .earth-section .section-title {
+      color: white;
+
+      font-size:
+        clamp(1.3rem, 5vw, 1.7rem);
+
+      text-shadow:
+        2px 2px 0 rgba(0,0,0,0.12);
+    }
+
+
+    .earth-section .sub-info {
+      color: #f2fbff;
+    }
+
+
+    .problem-points {
+      position: relative;
+
+      z-index: 2;
+
+      display: grid;
+
+      grid-template-columns:
+        1fr 1fr;
+
+      gap: 12px;
+
+      margin-top: 18px;
+    }
+
+
+    .problem-point {
+      padding: 13px;
+
+      background:
+        rgba(255,255,255,0.18);
+
+      border:
+        2px solid rgba(255,255,255,0.4);
+
+      border-radius: 20px;
+
+      color: white;
+
+      font-size: 0.83rem;
+
+      font-weight: 900;
+
+      backdrop-filter: blur(3px);
+    }
+
+
+    /* =========================================================
+       AI 체험 영역
+       페트병 실루엣
+       ========================================================= */
+
+    .bottle-section {
+      position: relative;
+
+      margin: 20px auto 35px;
+
+      width: min(100%, 760px);
+
+      padding:
+        75px 34px 40px;
+
+      background:
+        linear-gradient(
+          145deg,
+          #ffffff,
+          #eaf8ff
+        );
+
+      /*
+        페트병처럼 위쪽이 좁고
+        가운데가 넓어지는 느낌을 만듭니다.
+      */
+      border-radius:
+        48px 48px 42px 42px /
+        90px 90px 45px 45px;
+
+      border:
+        4px solid #77caff;
+
+      box-shadow:
+        var(--shadow-blue);
+
+      overflow: hidden;
+    }
+
+
+    /*
+      페트병 입구
+    */
+    .bottle-section::before {
+      content: "";
+
+      position: absolute;
+
+      top: -30px;
+      left: 50%;
+
+      width: 88px;
+      height: 85px;
+
+      transform:
+        translateX(-50%);
+
+      border-radius:
+        20px 20px 12px 12px;
+
+      background:
+        linear-gradient(
+          90deg,
+          #b9eaff,
+          #ffffff,
+          #a8e4ff
+        );
+
+      border:
+        4px solid #77caff;
+
+      box-shadow:
+        inset 0 -13px 0 rgba(36,120,215,0.08);
+    }
+
+
+    /*
+      병의 가운데 하이라이트
+    */
+    .bottle-section::after {
+      content: "";
+
+      position: absolute;
+
+      top: 90px;
+      left: 25px;
+
+      width: 13px;
+      height: 220px;
+
+      border-radius: 999px;
+
+      background:
+        rgba(255,255,255,0.7);
+
+      transform: rotate(3deg);
+    }
+
+
+    .bottle-content {
+      position: relative;
+
+      z-index: 3;
+    }
+
+
+    .experience-header {
+      display: flex;
+
+      align-items: flex-start;
+
+      justify-content: space-between;
+
+      gap: 15px;
+
+      margin-bottom: 20px;
+    }
+
+
+    .experience-title {
+      margin: 0;
+
+      color: var(--blue-deep);
+
+      font-size:
+        clamp(1.7rem, 7vw, 2.5rem);
+
+      line-height: 1;
+
+      letter-spacing: -0.07em;
+
+      font-weight: 1000;
+    }
+
+
+    .model-status {
+      flex: 0 0 auto;
+
+      min-width: 110px;
+
+      padding: 8px 12px;
+
+      border-radius: 999px;
+
+      background: #e9f1f6;
+
+      color: var(--muted);
+
+      font-size: 0.73rem;
+
+      font-weight: 900;
+
+      text-align: center;
+    }
+
+
+    .model-status.ready {
+      background: var(--green-light);
+
+      color: #16724a;
+    }
+
+
+    .model-status.error {
+      background: var(--red-light);
+
+      color: var(--red);
+    }
+
+
+    .model-status.loading {
+      background: var(--yellow-light);
+
+      color: #91640d;
+    }
+
+
+    /* =========================================================
+       입력 방법
+       ========================================================= */
+
+    .method-title {
+      margin: 0 0 10px;
+
+      color: var(--blue-dark);
+
+      font-size: 0.95rem;
+
+      font-weight: 1000;
+    }
+
+
+    .method-buttons {
+      display: grid;
+
+      grid-template-columns:
+        1fr 1fr;
+
+      gap: 10px;
+    }
+
+
+    .method-button {
+      min-height: 58px;
+
+      padding: 12px;
+
+      border:
+        3px solid #bde2f5;
+
+      border-radius: 20px;
+
+      background: white;
+
+      color: var(--text);
+
+      font-weight: 1000;
+
+      letter-spacing: -0.04em;
+
+      transition:
+        0.15s ease;
+    }
+
+
+    .method-button:hover:not(:disabled) {
+      transform: translateY(-2px);
+
+      border-color:
+        var(--blue);
+    }
+
+
+    .method-button.active {
+      background:
+        linear-gradient(
+          135deg,
+          #4aaaff,
+          #2478d7
+        );
+
+      border-color:
+        var(--blue);
+
+      color: white;
+
+      box-shadow:
+        0 8px 17px rgba(36,120,215,0.22);
+    }
+
+
+    /* =========================================================
+       버튼
+       ========================================================= */
+
+    .controls {
+      display: flex;
+
+      flex-wrap: wrap;
+
+      gap: 10px;
+
+      margin-top: 13px;
+    }
+
+
+    .primary-button,
+    .secondary-button,
+    .file-label {
+      min-height: 56px;
+
+      padding:
+        12px 19px;
+
+      border-radius: 18px;
+
+      font-weight: 1000;
+
+      letter-spacing: -0.035em;
+    }
+
+
+    .primary-button {
+      border: 0;
+
+      background:
+        linear-gradient(
+          135deg,
+          #46aaff,
+          #176bd0
+        );
+
+      color: white;
+
+      box-shadow:
+        0 8px 18px rgba(36,120,215,0.23);
+    }
+
+
+    .secondary-button {
+      border:
+        3px solid #cfe3ed;
+
+      background: white;
+
+      color: var(--text);
+    }
+
+
+    .file-label {
+      display: flex;
+
+      align-items: center;
+      justify-content: center;
+
+      background:
+        linear-gradient(
+          135deg,
+          #4aaaff,
+          #2478d7
+        );
+
+      color: white;
+
+      cursor: pointer;
+
+      box-shadow:
+        0 8px 18px rgba(36,120,215,0.2);
+    }
+
+
+    button:disabled {
+      opacity: 0.45;
+
+      cursor: not-allowed;
+    }
+
+
+    #imageInput {
+      position: absolute;
+
+      width: 1px;
+      height: 1px;
+
+      opacity: 0;
+
+      pointer-events: none;
+    }
+
+
+    button:focus-visible,
+    input:focus-visible {
+      outline:
+        3px solid rgba(36,120,215,0.3);
+
+      outline-offset: 3px;
+    }
+
+
+    /* =========================================================
+       상태 메시지
+       ========================================================= */
+
+    .message {
+      min-height: 50px;
+
+      margin-top: 14px;
+
+      padding: 13px 16px;
+
+      border-radius: 18px;
+
+      background:
+        #edf7fc;
+
+      border:
+        2px solid #d6ebf5;
+
+      color: var(--muted);
+
+      font-size: 0.86rem;
+
+      font-weight: 800;
+    }
+
+
+    .message.success {
+      background: var(--green-light);
+
+      border-color: #c5ead6;
+
+      color: #16724a;
+    }
+
+
+    .message.error {
+      background: var(--red-light);
+
+      border-color: #f0cccc;
+
+      color: var(--red);
+    }
+
+
+    .message.warning {
+      background: var(--yellow-light);
+
+      border-color: #efdfb8;
+
+      color: #825d0e;
+    }
+
+
+    /* =========================================================
+       카메라 / 이미지
+       ========================================================= */
+
+    .input-preview {
+      display: flex;
+
+      align-items: center;
+      justify-content: center;
+
+      width: 100%;
+
+      min-height: 290px;
+
+      margin-top: 16px;
+
+      overflow: hidden;
+
+      border-radius:
+        28px;
+
+      background:
+        #d8f1ff;
+
+      border:
+        3px solid #a8d9f5;
+    }
+
+
+    .preview-placeholder {
+      padding: 30px;
+
+      color: var(--muted);
+
+      text-align: center;
+
+      font-size: 0.9rem;
+
+      font-weight: 800;
+    }
+
+
+    #webcamContainer {
+      display: none;
+
+      width: 100%;
+    }
+
+
+    #webcamContainer canvas {
+      display: block;
+
+      width: 100%;
+      height: auto;
+
+      max-height: 540px;
+
+      object-fit: contain;
+
+      background: #102131;
+    }
+
+
+    #imagePreview {
+      display: none;
+
+      width: 100%;
+
+      max-height: 540px;
+
+      object-fit: contain;
+
+      background: #102131;
+    }
+
+
+    /* =========================================================
+       결과
+       ========================================================= */
+
+    .results {
+      margin-top: 20px;
+    }
+
+
+    .results-header {
+      display: flex;
+
+      justify-content: space-between;
+
+      align-items: center;
+
+      gap: 10px;
+
+      min-height: 30px;
+
+      margin-bottom: 10px;
+    }
+
+
+    .results-header h3 {
+      margin: 0;
+
+      color: var(--blue-deep);
+
+      font-size: 1.05rem;
+
+      font-weight: 1000;
+    }
+
+
+    .result-note {
+      color: var(--muted);
+
+      font-size: 0.74rem;
+
+      font-weight: 800;
+    }
+
+
+    /*
+      가장 높은 결과를 파란색 말풍선처럼 강조합니다.
+    */
+    .top-result {
+      display: flex;
+
+      align-items: center;
+
+      justify-content: space-between;
+
+      gap: 15px;
+
+      min-height: 94px;
+
+      margin-bottom: 14px;
+
+      padding: 16px 20px;
+
+      background:
+        linear-gradient(
+          135deg,
+          #e5f5ff,
+          #cfeeff
+        );
+
+      border:
+        3px solid #78c8f4;
+
+      border-radius:
+        27px 27px 27px 8px;
+
+      box-shadow:
+        0 7px 17px rgba(36,120,215,0.1);
+    }
+
+
+    .top-result-label {
+      min-width: 0;
+    }
+
+
+    .top-result-label small {
+      display: block;
+
+      color: var(--blue);
+
+      font-size: 0.73rem;
+
+      font-weight: 1000;
+    }
+
+
+    .top-result-label strong {
+      display: block;
+
+      overflow: hidden;
+
+      color: var(--blue-deep);
+
+      font-size:
+        clamp(1.35rem, 5vw, 1.9rem);
+
+      line-height: 1.2;
+
+      text-overflow: ellipsis;
+
+      white-space: nowrap;
+
+      font-weight: 1000;
+    }
+
+
+    .top-result-percent {
+      flex: 0 0 auto;
+
+      color: var(--blue);
+
+      font-size:
+        clamp(1.5rem, 6vw, 2.1rem);
+
+      font-weight: 1000;
+
+      line-height: 1;
+    }
+
+
+    .prediction-list {
+      display: grid;
+
+      gap: 12px;
+    }
+
+
+    .prediction-row {
+      min-height: 58px;
+
+      padding:
+        9px 12px;
+
+      background:
+        rgba(255,255,255,0.75);
+
+      border-radius: 16px;
+
+      border:
+        1px solid #d7ebf5;
+    }
+
+
+    .prediction-head {
+      display: flex;
+
+      align-items: center;
+
+      justify-content: space-between;
+
+      gap: 10px;
+
+      min-height: 25px;
+
+      font-size: 0.88rem;
+    }
+
+
+    .prediction-name {
+      overflow: hidden;
+
+      color: var(--text);
+
+      font-weight: 900;
+
+      text-overflow: ellipsis;
+
+      white-space: nowrap;
+    }
+
+
+    .prediction-percent {
+      flex: 0 0 55px;
+
+      color: var(--blue);
+
+      font-weight: 1000;
+
+      text-align: right;
+    }
+
+
+    .bar-background {
+      height: 11px;
+
+      margin-top: 5px;
+
+      overflow: hidden;
+
+      border-radius: 999px;
+
+      background: #dcebf3;
+    }
+
+
+    .bar {
+      width: 0%;
+
+      height: 100%;
+
+      border-radius: inherit;
+
+      background:
+        linear-gradient(
+          90deg,
+          #67c8ff,
+          #2478d7
+        );
+
+      transition:
+        width 0.15s ease;
+    }
+
+
+    /* =========================================================
+       클래스 영역
+       재활용 마크를 연상시키는 둥근 카드
+       ========================================================= */
+
+    .recycle-section {
+      position: relative;
+
+      margin: 30px auto;
+
+      padding:
+        55px 28px 35px;
+
+      background:
+        #f5fdff;
+
+      border:
+        4px solid #78cfa8;
+
+      border-radius:
+        45px 18px 45px 18px;
+
+      box-shadow:
+        0 13px 28px rgba(42, 145, 103, 0.12);
+
+      overflow: hidden;
+    }
+
+
+    .recycle-symbol {
+      position: absolute;
+
+      right: 25px;
+      top: 15px;
+
+      color:
+        rgba(28,168,107,0.14);
+
+      font-size: 4.5rem;
+
+      line-height: 1;
+    }
+
+
+    .recycle-section .section-title {
+      color: #168355;
+    }
+
+
+    .class-list {
+      display: grid;
+
+      grid-template-columns:
+        repeat(3, 1fr);
+
+      gap: 12px;
+
+      margin-top: 16px;
+    }
+
+
+    .class-item {
+      min-height: 75px;
+
+      padding: 13px;
+
+      display: flex;
+
+      align-items: center;
+      justify-content: center;
+
+      border:
+        3px solid #b8e5d1;
+
+      border-radius:
+        23px 8px 23px 8px;
+
+      background:
+        #eafaf2;
+
+      color:
+        #14764e;
+
+      text-align: center;
+
+      font-size: 0.88rem;
+
+      font-weight: 1000;
+    }
+
+
+    /* =========================================================
+       한계 - 말풍선
+       ========================================================= */
+
+    .warning-section {
+      position: relative;
+
+      margin: 30px auto;
+
+      padding:
+        35px 30px;
+
+      background:
+        #fffdf4;
+
+      border:
+        4px solid #f1d487;
+
+      border-radius:
+        28px;
+
+      box-shadow:
+        0 12px 28px rgba(185, 141, 38, 0.11);
+    }
+
+
+    /*
+      말풍선 꼬리
+    */
+    .warning-section::after {
+      content: "";
+
+      position: absolute;
+
+      bottom: -22px;
+
+      left: 60px;
+
+      width: 40px;
+      height: 40px;
+
+      background:
+        #fffdf4;
+
+      border-right:
+        4px solid #f1d487;
+
+      border-bottom:
+        4px solid #f1d487;
+
+      transform:
+        rotate(45deg);
+    }
+
+
+    .warning-section .section-title {
+      color: #986c0d;
+    }
+
+
+    .limit-list {
+      margin:
+        13px 0 0;
+
+      padding-left: 21px;
+
+      color: #7a6534;
+
+      font-size: 0.91rem;
+
+      font-weight: 800;
+    }
+
+
+    .limit-list li + li {
+      margin-top: 8px;
+    }
+
+
+    .human-check {
+      position: relative;
+
+      z-index: 2;
+
+      margin-top: 16px;
+
+      padding: 16px;
+
+      background:
+        #fff5d5;
+
+      border:
+        2px dashed #e1bd5e;
+
+      border-radius: 18px;
+
+      color: #68511e;
+
+      font-size: 0.9rem;
+
+      font-weight: 800;
+    }
+
+
+    .human-check strong {
+      display: block;
+
+      margin-bottom: 4px;
+
+      color: #5b430d;
+
+      font-weight: 1000;
+    }
+
+
+    /* =========================================================
+       팀
+       ========================================================= */
+
+    .team-section {
+      position: relative;
+
+      width: min(100%, 600px);
+
+      margin:
+        45px auto 0;
+
+      padding:
+        30px 28px;
+
+      text-align: center;
+
+      background:
+        white;
+
+      border:
+        4px solid #94d8fa;
+
+      border-radius:
+        50% 45% 50% 45%;
+
+      box-shadow:
+        var(--shadow);
+    }
+
+
+    .team-section .section-title {
+      color:
+        var(--blue-dark);
+    }
+
+
+    .team {
+      color: var(--muted);
+
+      font-size: 0.95rem;
+
+      font-weight: 900;
+    }
+
+
+    .team strong {
+      color: var(--blue);
+
+      font-weight: 1000;
+    }
+
+
+    .footer {
+      margin-top: 30px;
+
+      color: #7891a3;
+
+      font-size: 0.78rem;
+
+      font-weight: 800;
+
+      text-align: center;
+    }
+
+
+    /* =========================================================
+       모바일
+       ========================================================= */
+
+    @media (max-width: 680px) {
+
+      .page {
+        width:
+          min(100% - 16px, 980px);
+
+        padding-top: 12px;
+      }
+
+
+      .hero {
+        flex-direction: column-reverse;
+
+        justify-content: center;
+
+        text-align: center;
+
+        gap: 17px;
+
+        min-height: auto;
+
+        padding:
+          12px 5px 28px;
+      }
+
+
+      .hero-image-wrap {
+        flex-basis: auto;
+
+        width: 155px;
+        height: 155px;
+      }
+
+
+      .hero-description {
+        margin-left: auto;
+        margin-right: auto;
+      }
+
+
+      h1 {
+        font-size:
+          clamp(2.7rem, 17vw, 4.3rem);
+      }
+
+
+      /*
+        모바일에서는 지구가 너무 커지지 않도록 합니다.
+      */
+      .earth-section {
+        padding:
+          55px 28px;
+
+        border-radius:
+          50% 46% 53% 47%;
+      }
+
+
+      .problem-points {
+        grid-template-columns: 1fr;
+      }
+
+
+      .bottle-section {
+        padding:
+          68px 17px 30px;
+
+        border-radius:
+          38px 38px 32px 32px;
+      }
+
+
+      .experience-header {
+        display: block;
+      }
+
+
+      .model-status {
+        display: inline-block;
+
+        margin-top: 10px;
+      }
+
+
+      .method-buttons {
+        grid-template-columns: 1fr;
+      }
+
+
+      .controls {
+        display: grid;
+
+        grid-template-columns: 1fr;
+      }
+
+
+      .primary-button,
+      .secondary-button,
+      .file-label {
+        width: 100%;
+      }
+
+
+      .input-preview {
+        min-height: 220px;
+
+        border-radius: 20px;
+      }
+
+
+      .class-list {
+        grid-template-columns: 1fr;
+      }
+
+
+      .recycle-section {
+        padding:
+          40px 17px 28px;
+      }
+
+
+      .warning-section {
+        padding:
+          28px 20px;
+      }
+
+
+      .team-section {
+        border-radius:
+          38% 62% 45% 55%;
+      }
+    }
+
+
+    @media (max-width: 380px) {
+
+      .experience-title {
+        font-size: 1.55rem;
+      }
+
+
+      .top-result {
+        padding:
+          14px;
+      }
+
+
+      .top-result-label strong {
+        font-size: 1.25rem;
+      }
+    }
+  </style>
+</head>
+
+
+<body>
+
+  <main class="page">
+
+
+    <!-- =======================================================
+         HERO
+         ======================================================= -->
+
+    <header class="hero">
+
+      <div class="hero-text">
+
+        <span class="eyebrow">
+          학교 분리배출 AI 프로젝트
+        </span>
+
+        <h1>
+          Eco-Check<br>
+          AI
+        </h1>
+
+        <p class="hero-description">
+          페트병·캔의 분리배출 상태를
+          사진으로 확인해 보는 AI 체험입니다.
+        </p>
+
+      </div>
+
+
+      <!-- 기존에 사용한 캐릭터 이미지 -->
+      <div class="hero-image-wrap">
+
+        <img
+          class="hero-image"
+          src="OIP.webp"
+          alt="Eco-Check AI 캐릭터"
+        >
+
+      </div>
+
+    </header>
+
+
+    <!-- =======================================================
+         지구 모양 문제 소개
+         ======================================================= -->
+
+    <section class="earth-section">
+
+      <div class="earth-content">
+
+        <h2 class="section-title">
+          우리가 해결하려는 문제
+        </h2>
+
+        <p class="sub-info">
+          교실 및 복도 분리수거함에 라벨이 붙어 있거나
+          음료·이물질이 남은 채 버려진 용기가 많아
+          악취가 발생하고 재활용이 어려워지는 문제를
+          해결하고자 했습니다.
+        </p>
+
+
+        <div class="problem-points">
+
+          <div class="problem-point">
+            교실·복도의 분리수거 문제
+          </div>
+
+          <div class="problem-point">
+            올바른 분리배출을 돕는 AI
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <!-- =======================================================
+         페트병 모양 AI 체험
+         ======================================================= -->
+
+    <section class="bottle-section">
+
+      <div class="bottle-content">
+
+
+        <div class="experience-header">
+
+          <div>
+
+            <h2 class="experience-title">
+              직접 시험해 보세요
+            </h2>
+
+            <p class="sub-info">
+              카메라 또는 사진을 이용해
+              모델의 판단을 확인해 보세요.
+            </p>
+
+          </div>
+
+
+          <div
+            id="modelStatus"
+            class="model-status loading"
+          >
+            모델 준비 중
+          </div>
+
+        </div>
+
+
+        <!-- 입력 방법 -->
+
+        <p class="method-title">
+          입력 방법
+        </p>
+
+
+        <div class="method-buttons">
+
+          <button
+            type="button"
+            id="cameraMethodButton"
+            class="method-button active"
+          >
+            카메라로 실시간 분류
+          </button>
+
+
+          <button
+            type="button"
+            id="fileMethodButton"
+            class="method-button"
+          >
+            이미지 파일로 분류
+          </button>
+
+        </div>
+
+
+        <!-- 카메라 버튼 -->
+
+        <div
+          id="cameraControls"
+          class="controls"
+        >
+
+          <button
+            type="button"
+            id="startCameraButton"
+            class="primary-button"
+            disabled
+          >
+            카메라 시작
+          </button>
+
+
+          <button
+            type="button"
+            id="stopCameraButton"
+            class="secondary-button"
+            disabled
+          >
+            카메라 중지
+          </button>
+
+        </div>
+
+
+        <!-- 파일 버튼 -->
+
+        <div
+          id="fileControls"
+          class="controls"
+          style="display:none;"
+        >
+
+          <label
+            for="imageInput"
+            class="file-label"
+          >
+            이미지 파일 선택
+          </label>
+
+
+          <input
+            id="imageInput"
+            type="file"
+            accept="image/*"
+          >
+
+        </div>
+
+
+        <!-- 상태 메시지 -->
+
+        <div
+          id="message"
+          class="message"
+        >
+          모델을 불러오는 중입니다.
+          잠시 기다려 주세요.
+        </div>
+
+
+        <!-- 입력 화면 -->
+
+        <div class="input-preview">
+
+          <div
+            id="previewPlaceholder"
+            class="preview-placeholder"
+          >
+            카메라를 시작하거나 이미지를 선택하면
+            이곳에 입력 화면이 표시됩니다.
+          </div>
+
+
+          <div id="webcamContainer"></div>
+
+
+          <img
+            id="imagePreview"
+            alt="분류할 이미지 미리보기"
+          >
+
+        </div>
+
+
+        <!-- ===================================================
+             결과
+             =================================================== -->
+
+        <section
+          class="results"
+          aria-live="polite"
+        >
+
+          <div class="results-header">
+
+            <h3>
+              예측 결과
+            </h3>
+
+            <span class="result-note">
+              모든 클래스의 확률
+            </span>
+
+          </div>
+
+
+          <!-- 가장 높은 결과 -->
+
+          <div class="top-result">
+
+            <div class="top-result-label">
+
+              <small>
+                현재 가장 높은 예측
+              </small>
+
+              <strong id="topClass">
+                아직 예측하지 않았습니다
+              </strong>
+
+            </div>
+
+
+            <div
+              id="topPercent"
+              class="top-result-percent"
+            >
+              --%
+            </div>
+
+          </div>
+
+
+          <!-- 클래스별 확률 -->
+
+          <div
+            id="predictionList"
+            class="prediction-list"
+          >
+          </div>
+
+        </section>
+
+      </div>
+
+    </section>
+
+
+    <!-- =======================================================
+         재활용 마크 느낌의 클래스 영역
+         ======================================================= -->
+
+    <section class="recycle-section">
+
+      <div class="recycle-symbol">
+        ♻
+      </div>
+
+
+      <h2 class="section-title">
+        모델이 구분하는 실제 클래스
+      </h2>
+
+
+      <p class="sub-info">
+        모델의 metadata에서 실제 클래스 이름을
+        자동으로 불러옵니다.
+      </p>
+
+
+      <div
+        id="classList"
+        class="class-list"
+      >
+
+        <div class="class-item">
+          모델 로딩 중...
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <!-- =======================================================
+         주의사항 말풍선
+         ======================================================= -->
+
+    <section class="warning-section">
+
+      <h2 class="section-title">
+        AI 결과는 사람이 다시 확인해 주세요
+      </h2>
+
+
+      <ul class="limit-list">
+
+        <li>
+          이 모델은 사진을 보고 판단하기 때문에
+          모든 부분을 꼼꼼하게 확인하지 않을 수 있습니다.
+        </li>
+
+        <li>
+          플라스틱 병의 생김새에 따라
+          잘못된 예측이 나올 수 있습니다.
+        </li>
+
+      </ul>
+
+
+      <div class="human-check">
+
+        <strong>
+          사람이 꼭 확인할 부분
+        </strong>
+
+        빨대, 휴지 등 다른 쓰레기가 꽂혀 있거나
+        심하게 오염되어 분리배출이 불가능한 상태는
+        모델이 제대로 분별하지 못할 수 있습니다.
+        이런 경우에는 사람이 직접 확인해야 합니다.
+
+      </div>
+
+    </section>
+
+
+    <!-- =======================================================
+         팀
+         ======================================================= -->
+
+    <section class="team-section">
+
+      <h2 class="section-title">
+        PROJECT TEAM
+      </h2>
+
+
+      <p class="team">
+
+        <strong>팀명</strong>
+        집가고싶다
+
+        <br>
+
+        <strong>팀원</strong>
+        임채린 · 전민서
+
+      </p>
+
+    </section>
+
+
+    <footer class="footer">
+
+      Eco-Check AI
+      · 이미지 분류 결과는 참고용이며
+      최종 확인은 사람이 합니다.
+
+    </footer>
+
+
+  </main>
+
+
+  <script>
+    /* =========================================================
+       Eco-Check AI
+       Teachable Machine Image 모델 실행 코드
+       ========================================================= */
+
+
+    // ---------------------------------------------------------
+    // 제공받은 실제 Teachable Machine 모델 주소
+    // ---------------------------------------------------------
+
+    const MODEL_BASE_URL =
+      "https://teachablemachine.withgoogle.com/models/Zj8U6uYP_/";
+
+
+    const MODEL_URL =
+      MODEL_BASE_URL + "model.json";
+
+
+    const METADATA_URL =
+      MODEL_BASE_URL + "metadata.json";
+
+
+    // ---------------------------------------------------------
+    // 모델과 카메라 상태
+    // ---------------------------------------------------------
+
+    let model = null;
+
+    let webcam = null;
+
+    let maxPredictions = 0;
+
+    let cameraRunning = false;
+
+    let predictionRunning = false;
+
+    let animationFrameId = null;
+
+
+    // 업로드 이미지의 임시 주소
+    let currentObjectUrl = null;
+
+
+    // 현재 입력 방식
+    let currentMethod = "camera";
+
+
+    // ---------------------------------------------------------
+    // HTML 요소
+    // ---------------------------------------------------------
+
+    const modelStatus =
+      document.getElementById(
+        "modelStatus"
+      );
+
+
+    const message =
+      document.getElementById(
+        "message"
+      );
+
+
+    const cameraMethodButton =
+      document.getElementById(
+        "cameraMethodButton"
+      );
+
+
+    const fileMethodButton =
+      document.getElementById(
+        "fileMethodButton"
+      );
+
+
+    const cameraControls =
+      document.getElementById(
+        "cameraControls"
+      );
+
+
+    const fileControls =
+      document.getElementById(
+        "fileControls"
+      );
+
+
+    const startCameraButton =
+      document.getElementById(
+        "startCameraButton"
+      );
+
+
+    const stopCameraButton =
+      document.getElementById(
+        "stopCameraButton"
+      );
+
+
+    const imageInput =
+      document.getElementById(
+        "imageInput"
+      );
+
+
+    const previewPlaceholder =
+      document.getElementById(
+        "previewPlaceholder"
+      );
+
+
+    const webcamContainer =
+      document.getElementById(
+        "webcamContainer"
+      );
+
+
+    const imagePreview =
+      document.getElementById(
+        "imagePreview"
+      );
+
+
+    const topClass =
+      document.getElementById(
+        "topClass"
+      );
+
+
+    const topPercent =
+      document.getElementById(
+        "topPercent"
+      );
+
+
+    const predictionList =
+      document.getElementById(
+        "predictionList"
+      );
+
+
+    const classList =
+      document.getElementById(
+        "classList"
+      );
+
+
+    // ---------------------------------------------------------
+    // 상태 메시지
+    // ---------------------------------------------------------
+
+    function setMessage(
+      text,
+      type = ""
+    ) {
+
+      message.textContent =
+        text;
+
+      message.className =
+        "message";
+
+
+      if (type) {
+
+        message.classList.add(
+          type
+        );
+
+      }
+
+    }
+
+
+    // ---------------------------------------------------------
+    // 모델 상태
+    // ---------------------------------------------------------
+
+    function setModelStatus(
+      text,
+      type = ""
+    ) {
+
+      modelStatus.textContent =
+        text;
+
+      modelStatus.className =
+        "model-status";
+
+
+      if (type) {
+
+        modelStatus.classList.add(
+          type
+        );
+
+      }
+
+    }
+
+
+    // ---------------------------------------------------------
+    // metadata의 클래스 이름으로 결과 UI 생성
+    // ---------------------------------------------------------
+
+    function createPredictionRows() {
+
+      predictionList.innerHTML =
+        "";
+
+      classList.innerHTML =
+        "";
+
+
+      /*
+        클래스 이름을 직접 입력하지 않습니다.
+        실제 모델 metadata에서 가져옵니다.
+      */
+      const labels =
+        model.getClassLabels();
+
+
+      labels.forEach(
+        (label, index) => {
+
+
+          // -----------------------------
+          // 예측 결과 행
+          // -----------------------------
+
+          const row =
+            document.createElement(
+              "div"
+            );
+
+          row.className =
+            "prediction-row";
+
+
+          const head =
+            document.createElement(
+              "div"
+            );
+
+          head.className =
+            "prediction-head";
+
+
+          const name =
+            document.createElement(
+              "span"
+            );
+
+          name.className =
+            "prediction-name";
+
+          name.textContent =
+            label;
+
+
+          const percent =
+            document.createElement(
+              "span"
+            );
+
+          percent.className =
+            "prediction-percent";
+
+          percent.id =
+            "percent-" + index;
+
+          percent.textContent =
+            "0%";
+
+
+          const barBackground =
+            document.createElement(
+              "div"
+            );
+
+          barBackground.className =
+            "bar-background";
+
+
+          const bar =
+            document.createElement(
+              "div"
+            );
+
+          bar.className =
+            "bar";
+
+          bar.id =
+            "bar-" + index;
+
+
+          head.appendChild(
+            name
+          );
+
+          head.appendChild(
+            percent
+          );
+
+
+          barBackground.appendChild(
+            bar
+          );
+
+
+          row.appendChild(
+            head
+          );
+
+          row.appendChild(
+            barBackground
+          );
+
+
+          predictionList.appendChild(
+            row
+          );
+
+
+          // -----------------------------
+          // 클래스 이름
+          // -----------------------------
+
+          const classItem =
+            document.createElement(
+              "div"
+            );
+
+          classItem.className =
+            "class-item";
+
+          classItem.textContent =
+            label;
+
+
+          classList.appendChild(
+            classItem
+          );
+
+        }
+      );
+
+
+      maxPredictions =
+        labels.length;
+    }
+
+
+    // ---------------------------------------------------------
+    // 모델 로딩
+    // ---------------------------------------------------------
+
+    async function loadModel() {
+
+      setModelStatus(
+        "모델 로딩 중",
+        "loading"
+      );
+
+
+      setMessage(
+        "Teachable Machine 모델과 metadata를 불러오는 중입니다. 잠시 기다려 주세요.",
+        "warning"
+      );
+
+
+      try {
+
+        /*
+          제공받은 모델의 model.json과
+          metadata.json을 불러옵니다.
+        */
+        model =
+          await tmImage.load(
+            MODEL_URL,
+            METADATA_URL
+          );
+
+
+        /*
+          실제 클래스 이름을 metadata에서 가져옵니다.
+        */
+        createPredictionRows();
+
+
+        setModelStatus(
+          "모델 준비 완료",
+          "ready"
+        );
+
+
+        startCameraButton.disabled =
+          false;
+
+
+        setMessage(
+          "모델이 준비되었습니다. 카메라를 시작하거나 이미지 파일을 선택해 보세요.",
+          "success"
+        );
+
+
+      } catch (error) {
+
+        console.error(
+          "모델 로딩 실패:",
+          error
+        );
+
+
+        setModelStatus(
+          "로딩 실패",
+          "error"
+        );
+
+
+        startCameraButton.disabled =
+          true;
+
+
+        setMessage(
+          "모델을 불러오지 못했습니다. 인터넷 연결과 모델 주소가 올바른지 확인한 뒤 페이지를 새로고침해 주세요.",
+          "error"
+        );
+
+      }
+    }
+
+
+    // ---------------------------------------------------------
+    // 예측 결과 표시
+    // ---------------------------------------------------------
+
+    function showPredictions(
+      predictions
+    ) {
+
+      if (
+        !Array.isArray(predictions) ||
+        predictions.length === 0
+      ) {
+
+        return;
+
+      }
+
+
+      // 가장 높은 확률 찾기
+      let bestIndex = 0;
+
+
+      predictions.forEach(
+        (prediction, index) => {
+
+          if (
+            prediction.probability >
+            predictions[bestIndex].probability
+          ) {
+
+            bestIndex =
+              index;
+
+          }
+
+        }
+      );
+
+
+      const bestPrediction =
+        predictions[bestIndex];
+
+
+      // 가장 높은 클래스 표시
+      topClass.textContent =
+        bestPrediction.className;
+
+
+      const bestPercent =
+        Math.max(
+          0,
+          Math.min(
+            100,
+            bestPrediction.probability * 100
+          )
+        );
+
+
+      topPercent.textContent =
+        bestPercent.toFixed(1) +
+        "%";
+
+
+      // 모든 클래스 업데이트
+      predictions.forEach(
+        (prediction, index) => {
+
+          const percent =
+            Math.max(
+              0,
+              Math.min(
+                100,
+                prediction.probability * 100
+              )
+            );
+
+
+          const percentElement =
+            document.getElementById(
+              "percent-" + index
+            );
+
+
+          const barElement =
+            document.getElementById(
+              "bar-" + index
+            );
+
+
+          if (percentElement) {
+
+            percentElement.textContent =
+              percent.toFixed(1) +
+              "%";
+
+          }
+
+
+          if (barElement) {
+
+            barElement.style.width =
+              percent + "%";
+
+          }
+
+        }
+      );
+
+    }
+
+
+    // ---------------------------------------------------------
+    // 결과 초기화
+    // ---------------------------------------------------------
+
+    function resetPredictions() {
+
+      topClass.textContent =
+        "아직 예측하지 않았습니다";
+
+
+      topPercent.textContent =
+        "--%";
+
+
+      if (!model) {
+        return;
+      }
+
+
+      const labels =
+        model.getClassLabels();
+
+
+      labels.forEach(
+        (_, index) => {
+
+          const percentElement =
+            document.getElementById(
+              "percent-" + index
+            );
+
+
+          const barElement =
+            document.getElementById(
+              "bar-" + index
+            );
+
+
+          if (percentElement) {
+
+            percentElement.textContent =
+              "0%";
+
+          }
+
+
+          if (barElement) {
+
+            barElement.style.width =
+              "0%";
+
+          }
+
+        }
+      );
+
+    }
+
+
+    // ---------------------------------------------------------
+    // 카메라 완전 중지
+    // ---------------------------------------------------------
+
+    async function stopCamera() {
+
+      cameraRunning =
+        false;
+
+      predictionRunning =
+        false;
+
+
+      // 반복 예측 중지
+      if (
+        animationFrameId !== null
+      ) {
+
+        cancelAnimationFrame(
+          animationFrameId
+        );
+
+        animationFrameId =
+          null;
+
+      }
+
+
+      // Teachable Machine 웹캠 정리
+      if (webcam) {
+
+        try {
+
+          webcam.stop();
+
+        } catch (error) {
+
+          console.warn(
+            "웹캠 중지 오류:",
+            error
+          );
+
+        }
+
+
+        webcam =
+          null;
+
+      }
+
+
+      webcamContainer.innerHTML =
+        "";
+
+      webcamContainer.style.display =
+        "none";
+
+
+      stopCameraButton.disabled =
+        true;
+
+
+      startCameraButton.disabled =
+        false;
+
+
+      if (
+        currentMethod === "camera"
+      ) {
+
+        previewPlaceholder.style.display =
+          "block";
+
+      }
+
+    }
+
+
+    // ---------------------------------------------------------
+    // 카메라 시작
+    // ---------------------------------------------------------
+
+    async function startCamera() {
+
+      if (!model) {
+
+        setMessage(
+          "모델이 아직 준비되지 않았습니다. 모델 로딩이 끝날 때까지 기다려 주세요.",
+          "warning"
+        );
+
+        return;
+
+      }
+
+
+      /*
+        이미 실행 중이면 아무것도 하지 않습니다.
+        버튼을 여러 번 눌러도 중복 실행되지 않습니다.
+      */
+      if (
+        cameraRunning ||
+        predictionRunning
+      ) {
+
+        return;
+
+      }
+
+
+      await stopCamera();
+
+
+      // 업로드 이미지 숨기기
+      imagePreview.style.display =
+        "none";
+
+
+      previewPlaceholder.style.display =
+        "none";
+
+
+      try {
+
+        setMessage(
+          "카메라를 시작하는 중입니다. 브라우저의 카메라 권한 요청을 허용해 주세요.",
+          "warning"
+        );
+
+
+        /*
+          Teachable Machine WebCam 생성
+        */
+        webcam =
+          new tmImage.Webcam(
+            480,
+            480,
+            true
+          );
+
+
+        /*
+          여기에서만 카메라 권한을 요청합니다.
+        */
+        await webcam.setup();
+
+        await webcam.play();
+
+
+        cameraRunning =
+          true;
+
+        predictionRunning =
+          true;
+
+
+        webcamContainer.innerHTML =
+          "";
+
+
+        webcamContainer.appendChild(
+          webcam.canvas
+        );
+
+
+        webcamContainer.style.display =
+          "block";
+
+
+        startCameraButton.disabled =
+          true;
+
+        stopCameraButton.disabled =
+          false;
+
+
+        setMessage(
+          "카메라가 실행되었습니다. 페트병을 화면에 보여 주세요.",
+          "success"
+        );
+
+
+        runCameraPrediction();
+
+
+      } catch (error) {
+
+        console.error(
+          "카메라 실행 실패:",
+          error
+        );
+
+
+        await stopCamera();
+
+
+        if (
+          error &&
+          (
+            error.name ===
+              "NotAllowedError" ||
+            error.name ===
+              "PermissionDeniedError"
+          )
+        ) {
+
+          setMessage(
+            "카메라 권한이 거부되었습니다. 브라우저 주소창의 카메라 권한을 허용한 뒤 다시 눌러 주세요.",
+            "error"
+          );
+
+
+        } else if (
+          error &&
+          (
+            error.name ===
+              "NotFoundError" ||
+            error.name ===
+              "DevicesNotFoundError"
+          )
+        ) {
+
+          setMessage(
+            "사용할 수 있는 카메라를 찾지 못했습니다. 카메라가 연결되어 있는지 확인해 주세요.",
+            "error"
+          );
+
+
+        } else if (
+          error &&
+          error.name ===
+            "NotReadableError"
+        ) {
+
+          setMessage(
+            "카메라를 사용할 수 없습니다. 다른 앱이 카메라를 사용 중인지 확인한 뒤 다시 시도해 주세요.",
+            "error"
+          );
+
+
+        } else {
+
+          setMessage(
+            "카메라를 시작하지 못했습니다. HTTPS 환경인지 확인하고 브라우저의 카메라 권한을 확인해 주세요.",
+            "error"
+          );
+
+        }
+
+      }
+
+    }
+
+
+    // ---------------------------------------------------------
+    // 카메라 실시간 예측
+    // ---------------------------------------------------------
+
+    async function runCameraPrediction() {
+
+      if (
+        !cameraRunning ||
+        !predictionRunning ||
+        !webcam ||
+        !model
+      ) {
+
+        return;
+
+      }
+
+
+      try {
+
+        // 웹캠 화면 업데이트
+        webcam.update();
+
+
+        /*
+          웹캠 캔버스를 model.predict()에 전달합니다.
+        */
+        const predictions =
+          await model.predict(
+            webcam.canvas
+          );
+
+
+        /*
+          업로드 이미지와 동일한 결과 영역을 사용합니다.
+        */
+        showPredictions(
+          predictions
+        );
+
+
+      } catch (error) {
+
+        console.error(
+          "카메라 예측 실패:",
+          error
+        );
+
+
+        if (cameraRunning) {
+
+          setMessage(
+            "카메라 이미지를 분석하지 못했습니다. 카메라를 중지한 뒤 다시 시작해 주세요.",
+            "error"
+          );
+
+        }
+
+      }
+
+
+      // 계속 실행 중이면 다음 프레임에서도 실행
+      if (
+        cameraRunning &&
+        predictionRunning
+      ) {
+
+        animationFrameId =
+          requestAnimationFrame(
+            runCameraPrediction
+          );
+
+      }
+
+    }
+
+
+    // ---------------------------------------------------------
+    // 카메라 입력 선택
+    // ---------------------------------------------------------
+
+    async function selectCameraMethod() {
+
+      currentMethod =
+        "camera";
+
+
+      // 카메라와 예측 반복 정리
+      await stopCamera();
+
+
+      // 업로드 이미지 정리
+      clearImagePreview();
+
+
+      cameraMethodButton.classList.add(
+        "active"
+      );
+
+
+      fileMethodButton.classList.remove(
+        "active"
+      );
+
+
+      cameraControls.style.display =
+        "flex";
+
+
+      fileControls.style.display =
+        "none";
+
+
+      previewPlaceholder.style.display =
+        "block";
+
+
+      webcamContainer.style.display =
+        "none";
+
+
+      imagePreview.style.display =
+        "none";
+
+
+      resetPredictions();
+
+
+      if (model) {
+
+        setMessage(
+          "카메라를 사용하려면 카메라 시작 버튼을 눌러 주세요.",
+          "success"
+        );
+
+      }
+
+    }
+
+
+    // ---------------------------------------------------------
+    // 파일 입력 선택
+    // ---------------------------------------------------------
+
+    async function selectFileMethod() {
+
+      currentMethod =
+        "file";
+
+
+      /*
+        카메라가 실행 중이라면
+        먼저 완전히 종료합니다.
+      */
+      await stopCamera();
+
+
+      cameraMethodButton.classList.remove(
+        "active"
+      );
+
+
+      fileMethodButton.classList.add(
+        "active"
+      );
+
+
+      cameraControls.style.display =
+        "none";
+
+
+      fileControls.style.display =
+        "flex";
+
+
+      previewPlaceholder.style.display =
+        "block";
+
+
+      webcamContainer.style.display =
+        "none";
+
+
+      imagePreview.style.display =
+        "none";
+
+
+      resetPredictions();
+
+
+      setMessage(
+        "카메라 권한 없이 이미지 파일을 선택할 수 있습니다.",
+        "success"
+      );
+
+    }
+
+
+    // ---------------------------------------------------------
+    // 이미지 미리보기 정리
+    // ---------------------------------------------------------
+
+    function clearImagePreview() {
+
+      imagePreview.onload =
+        null;
+
+      imagePreview.onerror =
+        null;
+
+
+      imagePreview.removeAttribute(
+        "src"
+      );
+
+
+      imagePreview.style.display =
+        "none";
+
+
+      /*
+        이전 Object URL을 메모리에서 제거합니다.
+      */
+      if (currentObjectUrl) {
+
+        URL.revokeObjectURL(
+          currentObjectUrl
+        );
+
+        currentObjectUrl =
+          null;
+
+      }
+
+
+      imageInput.value =
+        "";
+
+    }
+
+
+    // ---------------------------------------------------------
+    // 이미지 파일 처리
+    // ---------------------------------------------------------
+
+    async function handleImageFile(
+      event
+    ) {
+
+      const file =
+        event.target.files &&
+        event.target.files[0];
+
+
+      if (!file) {
+        return;
+      }
+
+
+      /*
+        파일을 선택하면 혹시 실행 중인 카메라부터 중지합니다.
+      */
+      await stopCamera();
+
+
+      // 이미지 파일인지 확인
+      if (
+        !file.type ||
+        !file.type.startsWith(
+          "image/"
+        )
+      ) {
+
+        clearImagePreview();
+
+
+        setMessage(
+          "이미지 파일이 아닙니다. JPG, PNG 등 이미지 파일을 선택해 주세요.",
+          "error"
+        );
+
+
+        return;
+      }
+
+
+      // 이전 Object URL 정리
+      if (currentObjectUrl) {
+
+        URL.revokeObjectURL(
+          currentObjectUrl
+        );
+
+        currentObjectUrl =
+          null;
+
+      }
+
+
+      /*
+        브라우저 안에서만 사용하는 임시 이미지 주소입니다.
+        서버로 업로드하지 않습니다.
+      */
+      const objectUrl =
+        URL.createObjectURL(
+          file
+        );
+
+
+      currentObjectUrl =
+        objectUrl;
+
+
+      // 이미지 로딩 성공
+      imagePreview.onload =
+        async function () {
+
+          previewPlaceholder.style.display =
+            "none";
+
+
+          webcamContainer.style.display =
+            "none";
+
+
+          imagePreview.style.display =
+            "block";
+
+
+          if (!model) {
+
+            setMessage(
+              "모델이 아직 준비되지 않았습니다. 잠시 기다려 주세요.",
+              "warning"
+            );
+
+
+            return;
+          }
+
+
+          try {
+
+            setMessage(
+              "이미지를 분석하는 중입니다.",
+              "warning"
+            );
+
+
+            /*
+              HTML img 요소를 직접
+              model.predict()에 전달합니다.
+            */
+            const predictions =
+              await model.predict(
+                imagePreview
+              );
+
+
+            /*
+              카메라와 같은 결과 영역에 표시합니다.
+            */
+            showPredictions(
+              predictions
+            );
+
+
+            setMessage(
+              "이미지 분류가 완료되었습니다. 가장 높은 확률의 결과도 사람이 다시 확인해 주세요.",
+              "success"
+            );
+
+
+          } catch (error) {
+
+            console.error(
+              "이미지 예측 실패:",
+              error
+            );
+
+
+            setMessage(
+              "이미지를 분석하지 못했습니다. 다른 이미지 파일을 선택해 다시 시도해 주세요.",
+              "error"
+            );
+
+          }
+
+        };
+
+
+      // 이미지 읽기 실패
+      imagePreview.onerror =
+        function () {
+
+          clearImagePreview();
+
+
+          setMessage(
+            "이미지 파일을 읽을 수 없습니다. 파일이 손상되지 않았는지 확인하고 다른 이미지로 다시 시도해 주세요.",
+            "error"
+          );
+
+        };
+
+
+      // 미리보기 시작
+      imagePreview.src =
+        objectUrl;
+
+    }
+
+
+    // ---------------------------------------------------------
+    // 이벤트 연결
+    // ---------------------------------------------------------
+
+    cameraMethodButton.addEventListener(
+      "click",
+      selectCameraMethod
+    );
+
+
+    fileMethodButton.addEventListener(
+      "click",
+      selectFileMethod
+    );
+
+
+    startCameraButton.addEventListener(
+      "click",
+      startCamera
+    );
+
+
+    stopCameraButton.addEventListener(
+      "click",
+      async function () {
+
+        await stopCamera();
+
+
+        resetPredictions();
+
+
+        setMessage(
+          "카메라를 중지했습니다. 다시 시작하려면 카메라 시작 버튼을 눌러 주세요.",
+          "success"
+        );
+
+      }
+    );
+
+
+    imageInput.addEventListener(
+      "change",
+      handleImageFile
+    );
+
+
+    // ---------------------------------------------------------
+    // 페이지를 떠날 때 정리
+    // ---------------------------------------------------------
+
+    window.addEventListener(
+      "beforeunload",
+      function () {
+
+        if (
+          animationFrameId !== null
+        ) {
+
+          cancelAnimationFrame(
+            animationFrameId
+          );
+
+        }
+
+
+        if (webcam) {
+
+          try {
+
+            webcam.stop();
+
+          } catch (error) {
+
+            console.warn(error);
+
+          }
+
+        }
+
+
+        if (currentObjectUrl) {
+
+          URL.revokeObjectURL(
+            currentObjectUrl
+          );
+
+        }
+
+      }
+    );
+
+
+    // ---------------------------------------------------------
+    // 페이지가 열리면 모델만 로딩합니다.
+    // 카메라는 자동으로 켜지지 않습니다.
+    // ---------------------------------------------------------
+
+    loadModel();
+
+  </script>
+
+</body>
+</html>
